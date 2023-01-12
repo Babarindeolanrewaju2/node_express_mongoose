@@ -365,6 +365,10 @@ router.delete('/orders/:id', deleteOrder);
 export default router;
 
 
+app.use('/api', routes)
+
+
+
 import {
     Schema
 } from 'mongoose';
@@ -421,4 +425,113 @@ app.post('/upload', upload.array('images', 12), (req, res) => {
                 error
             });
         });
+});
+
+
+import request from 'supertest';
+import app from '../app';
+import db from '../models';
+
+describe('Order routes', () => {
+    afterAll(async () => {
+        await db.sequelize.close();
+    });
+
+    test('should create an order', async () => {
+        const product = await db.Product.create({
+            name: 'Test Product',
+            price: 10
+        });
+        const order = {
+            customerName: 'John Doe',
+            customerAddress: '123 Main St',
+            productId: product.id,
+            total: 10
+        };
+
+        const response = await request(app)
+            .post('/api/orders')
+            .send(order);
+
+        expect(response.status).toBe(201);
+        expect(response.body).toHaveProperty('customerName', order.customerName);
+        expect(response.body).toHaveProperty('customerAddress', order.customerAddress);
+        expect(response.body).toHaveProperty('productId', order.productId);
+        expect(response.body).toHaveProperty('total', order.total);
+    });
+
+    test('should get all orders', async () => {
+        const response = await request(app).get('/api/orders');
+
+        expect(response.status).toBe(200);
+        expect(response.body).toBeInstanceOf(Array);
+    });
+
+    test('should get an order by id', async () => {
+        const product = await db.Product.create({
+            name: 'Test Product',
+            price: 10
+        });
+        const order = await db.Order.create({
+            customerName: 'John Doe',
+            customerAddress: '123 Main St',
+            productId: product.id,
+            total: 10
+        });
+        const response = await request(app).get(`/api/orders/${order.id}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveProperty('customerName', order.customerName);
+        expect(response.body).toHaveProperty('customerAddress', order.customerAddress);
+        expect(response.body).toHaveProperty('productId', order.productId);
+        expect(response.body).toHaveProperty('total', order.total);
+    });
+
+    test('should update an order', async () => {
+        const product = await db.Product.create({
+            name: 'Test Product',
+            price: 10
+        });
+        const order = await db.Order.create({
+            customerName: 'John Doe',
+            customerAddress: '123 Main St',
+            productId: product.id,
+            total: 10
+        });
+        const updatedOrder = {
+            customerName: 'Jane Doe',
+            customerAddress: '456 Elm St',
+            productId: product.id,
+            total: 15
+        };
+        const response = await request(app)
+            .put(`/api/orders/${order.id}`)
+            .send(updatedOrder);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveProperty('customerName', updatedOrder.customerName);
+        expect(response.body).toHaveProperty('customerAddress', updatedOrder.customerAddress);
+        expect(response.body).toHaveProperty('productId', updatedOrder.productId);
+        expect(response.body).toHaveProperty('total', updatedOrder.total);
+
+    });
+
+    test('should delete an order', async () => {
+        const product = await db.Product.create({
+            name: 'Test Product',
+            price: 10
+        });
+        const order = await db.Order.create({
+            customerName: 'John Doe',
+            customerAddress: '123 Main St',
+            productId: product.id,
+            total: 10
+        });
+
+        const response = await request(app).delete(`/api/orders/${order.id}`);
+
+        expect(response.status).toBe(200);
+        expect(response.body).toHaveProperty('message', 'Order deleted');
+
+    });
 });
