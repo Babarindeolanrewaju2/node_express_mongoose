@@ -278,6 +278,62 @@ router.post("/booking", async (req, res) => {
     res.json(newBooking);
 });
 
+router.post("/pay", async (req, res) => {
+    const {
+        bookingId
+    } = req.body;
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+        return res.status(404).json({
+            message: "Booking not found"
+        });
+    }
+    const paymentData = {
+        intent: "sale",
+        payer: {
+            payment_method: "paypal"
+        },
+        redirect_urls: {
+            return_url: "http://localhost:3000/success",
+            cancel_url: "http://localhost:3000/cancel"
+        },
+        transactions: [{
+            item_list: {
+                items: [{
+                    name: booking.equipmentId.name,
+                    sku: booking._id.toString(),
+                    price: booking.rentalCost,
+                    currency: "USD",
+                    quantity: 1
+                }]
+            },
+            amount: {
+                currency: "USD",
+                total: booking.rentalCost
+            },
+            description: "Rental of Farm Equipment"
+        }]
+    };
+    try {
+        // call the createPayment method of the PayPal SDK
+        const payment = await paypal.payment.create(paymentData);
+        let redirectUrl;
+        // iterate through the links object to find the approval_url
+        payment.links.forEach(link => {
+            if (link.rel === "approval_url") {
+                redirectUrl = link.href;
+            }
+        });
+        // redirect the user to the approval_url
+        res.redirect(redirectUrl);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({
+            message: "Error while processing payment"
+        });
+    }
+});
+
 
 const chai = require("chai");
 const chaiHttp = require("chai-http");
@@ -366,6 +422,37 @@ describe("Booking", () => {
                 res.body.should.have.property("equipmentId").eql(equipment._id.toString());
                 res.body.should.have.property("startTime").eql(newBooking.startTime.toISOString());
                 res.body.should.have.property("endTime").eql(newBooking.endTime.toISOString());
+                done();
+            });
+    });
+});
+
+describe("Payment", () => {
+    it("should make payment and redirect to success page", async (done) => {
+        // create test data
+        const equipment = new FarmEquipment({
+            name: "Tractor",
+            description: "Farm Tractor",
+            hourlyRate: 50,
+            available: true
+        });
+        await equipment.save();
+        const booking = new Booking({
+            equipmentId: equipment._id,
+            startTime: new Date("2022-08-02T12:00:00.000Z"),
+            endTime: new Date("2022-08-02T16:00:00.000Z")
+        });
+        await booking.save();
+        // make a POST request
+        chai
+            .request(server)
+            .post("/pay")
+            .send({
+                bookingId: booking._id
+            })
+            .end((err, res) => {
+                res.should.have.status(302);
+                res.should.have.header("location", "http://localhost:3000/success");
                 done();
             });
     });
