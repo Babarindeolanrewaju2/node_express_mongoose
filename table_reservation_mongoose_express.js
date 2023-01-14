@@ -257,6 +257,78 @@ router.delete('/reservations/:id', async (req, res) => {
 
 module.exports = router;
 
+
+const Reservation = require('path/to/models/reservation');
+const stripe = require("stripe")("sk_test_your_secret_key_here");
+
+const nodemailer = require('nodemailer');
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: 'your-email@gmail.com',
+        pass: 'your-email-password'
+    }
+});
+
+const sendEmail = (email, subject, text) => {
+    const mailOptions = {
+        from: 'your-email@gmail.com',
+        to: email,
+        subject: subject,
+        text: text
+    };
+
+    transporter.sendMail(mailOptions, function (error, info) {
+        if (error) {
+            console.log(error);
+        } else {
+            console.log('Email sent: ' + info.response);
+        }
+    });
+}
+
+
+app.post("/reservation/:id/payment", async (req, res) => {
+    try {
+        // Extract the token and the amount from the request body
+        const {
+            token
+        } = req.body;
+        const reservation = await Reservation.findById(req.params.id)
+        const amount = reservation.totalAmount;
+
+        // Create a new charge using the Stripe library
+        const charge = await stripe.charges.create({
+            amount: amount,
+            currency: "usd",
+            source: token,
+            description: "Example charge"
+        });
+
+        // Update the reservation status
+        reservation.status = 'paid'
+        await reservation.save()
+
+        // Send an email to the customer
+        const email = reservation.email;
+        const subject = 'Payment Confirmation';
+        const text = 'Your reservation payment was successful';
+        sendEmail(email, subject, text);
+
+        // Send a success response to the client
+        res.json({
+            message: "Payment successful"
+        });
+    } catch (error) {
+        // Send an error response to the client
+        res.status(500).json({
+            error: error.message
+        });
+    }
+});
+
+
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 const server = require('path/to/server');
