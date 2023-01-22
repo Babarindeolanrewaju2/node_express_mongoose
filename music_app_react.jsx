@@ -7,6 +7,7 @@ const App = () => {
   const [audio, setAudio] = useState(new Audio());
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [buffered, setBuffered] = useState(0);
 
   useEffect(() => {
     // Fetch data from a JSON file or API endpoint
@@ -52,6 +53,11 @@ const App = () => {
 
   const handleTimeUpdate = () => {
     setCurrentTime(audio.currentTime);
+    setBuffered(audio.buffered.end(audio.buffered.length - 1));
+  };
+
+  const handleSeeking = (e) => {
+    setCurrentTime(e.target.value);
   };
 
   return (
@@ -78,12 +84,30 @@ const App = () => {
               controls
               onTimeUpdate={handleTimeUpdate}
             />
-            {isPlaying ? (
-              <button onClick={pause}>Pause</button>
-            ) : (
-              <button onClick={play}>Play</button>
-            )}
-            <button onClick={stop}>Stop</button>
+
+            <div className="controls">
+              {isPlaying ? (
+                <button onClick={pause}>Pause</button>
+              ) : (
+                <button onClick={play}>Play</button>
+              )}
+              <button onClick={stop}>Stop</button>
+            </div>
+            <div className="time-display">
+              <span>{formatTime(currentTime)}</span>
+              <input
+                type="range"
+                min={0}
+                max={selectedSong.duration}
+                value={currentTime}
+                onChange={handleSeeking}
+              />
+              <span>{formatTime(selectedSong.duration)}</span>
+            </div>
+            <div
+              className="buffered-bar"
+              style={{ width: `${(buffered / selectedSong.duration) * 100}%` }}
+            />
           </>
         ) : (
           <p>Select a song to view details</p>
@@ -92,3 +116,10 @@ const App = () => {
     </div>
   );
 };
+const formatTime = (timeInSeconds) => {
+  const minutes = Math.floor(timeInSeconds / 60);
+  const seconds = Math.floor(timeInSeconds % 60);
+  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+};
+
+export default App;
