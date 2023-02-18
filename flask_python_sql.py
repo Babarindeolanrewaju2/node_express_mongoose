@@ -1,5 +1,15 @@
+from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
-from flask import Flask, jsonify, request
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = 'super-secret'
+app.config['JWT_SECRET_KEY'] = 'jwt-secret'
+
+db = SQLAlchemy(app)
+jwt = JWTManager(app)
 
 # CREATE TABLE users(
 #     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -15,12 +25,6 @@ from flask import Flask, jsonify, request
 #     user_id INTEGER NOT NULL,
 #     FOREIGN KEY(user_id) REFERENCES users(id)
 # )
-
-app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///test.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-db = SQLAlchemy(app)
 
 
 class User(db.Model):
@@ -44,6 +48,26 @@ class Product(db.Model):
         return f"Product(id={self.id}, name='{self.name}', price={self.price})"
 
 # User endpoints
+
+
+@app.route('/login', methods=['POST'])
+def login():
+    email = request.json.get('email')
+    password = request.json.get('password')
+    user = User.query.filter_by(email=email).first()
+    if user is None or user.password != password:
+        return jsonify({'error': 'Invalid email or password'}), 401
+    else:
+        access_token = create_access_token(identity=user.id)
+        return jsonify({'access_token': access_token}), 200
+
+
+@app.route('/protected', methods=['GET'])
+@jwt_required()
+def protected():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    return jsonify({'email': user.email}), 200
 
 
 @app.route('/users', methods=['GET'])
@@ -152,3 +176,7 @@ def delete_product(product_id):
         return '', 204
     else:
         return jsonify({'error': 'Product not found'}), 404
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
