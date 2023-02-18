@@ -18,6 +18,9 @@ class User(db.Model):
     is_admin = db.Column(db.Boolean, default=False)
 
 
+db.create_all()
+
+
 @app.route('/login', methods=['POST'])
 def login():
     email = request.json.get('email', None)
