@@ -43,4 +43,4 @@ def protected():
         return jsonify({'error': 'Unauthorized access'}), 403
 
     # If user is authorized, continue with the protected route logic
-    return jsonify({'email': user.email}), 200s
+    return jsonify({'email': user.email}), 200
