@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from flask import Flask, request, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
@@ -110,6 +111,36 @@ def bookings():
         db.session.commit()
 
         return jsonify(booking.__dict__)
+
+
+@app.route('/total_bookings_week')
+def total_bookings_week():
+    # Calculate the start and end dates for the current week
+    today = datetime.now().date()
+    start_date = today - timedelta(days=today.weekday())
+    end_date = start_date + timedelta(days=7)
+
+    # Use SQLAlchemy's func.sum to calculate the total price of all bookings within the week
+    total_price = db.session.query(func.sum(Booking.price)).\
+        filter(Booking.check_in_date >= start_date,
+               Booking.check_out_date < end_date).scalar()
+
+    return jsonify({'total_price': total_price})
+
+
+@app.route('/total_bookings_month')
+def total_bookings_month():
+    # Calculate the start and end dates for the current month
+    today = datetime.now().date()
+    start_date = today.replace(day=1)
+    end_date = start_date.replace(month=start_date.month+1) - timedelta(days=1)
+
+    # Use SQLAlchemy's func.sum to calculate the total price of all bookings within the month
+    total_price = db.session.query(func.sum(Booking.price)).\
+        filter(Booking.check_in_date >= start_date,
+               Booking.check_out_date < end_date).scalar()
+
+    return jsonify({'total_price': total_price})
 
 
 @app.route('/most_booked_room')
