@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import backref
 from flask_bcrypt import Bcrypt
 from flask_uploads import UploadSet, IMAGES, configure_uploads
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///example.db'
@@ -279,6 +280,34 @@ def delete_image(image_id):
     db.session.delete(img)
     db.session.commit()
     return '', 204
+
+
+
+@app.route('/products/top-selling', methods=['GET'])
+def top_selling_products():
+    # Get the date for the start of the week
+    start_of_week = datetime.now().date() - timedelta(days=datetime.now().weekday())
+
+    # Query for the top 5 products sold in the current week
+    top_products = db.session.query(OrderItem.product_id, func.sum(OrderItem.quantity).label('total_sales')) \
+        .join(Order) \
+        .filter(Order.order_date >= start_of_week) \
+        .group_by(OrderItem.product_id) \
+        .order_by(desc('total_sales')) \
+        .limit(5) \
+        .all()
+
+    # Build a list of dictionaries for the top products
+    top_product_list = []
+    for product_id, total_sales in top_products:
+        product = Product.query.get(product_id)
+        product_dict = product.__dict__
+        product_dict['total_sales'] = total_sales
+        top_product_list.append(product_dict)
+
+    # Return the top products as a JSON response
+    return jsonify(top_product_list)
+
 
 
 # Run the app
