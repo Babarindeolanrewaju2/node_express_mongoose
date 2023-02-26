@@ -237,7 +237,6 @@ delete '/products/:id' do |id|
 
   # Validate the token
   if validate_token(token)
-
     # Delete the product with the specified ID from the database
     result = db.query("DELETE FROM products WHERE id = '#{id}'")
 
