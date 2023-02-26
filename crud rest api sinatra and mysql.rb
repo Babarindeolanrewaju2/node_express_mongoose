@@ -187,7 +187,6 @@ post '/products' do
 end
 
 put '/products/:id' do
-Parse Authorization header
 token = extract_token(request.env['HTTP_AUTHORIZATION'])
 
   if validate_token(token)
@@ -203,3 +202,18 @@ token = extract_token(request.env['HTTP_AUTHORIZATION'])
     halt 401, { 'error' => 'Invalid token' }.to_json
   end
 end
+
+# DELETE route for deleting a product by ID
+delete '/products/:id' do |id|
+  # Delete the product with the specified ID from the database
+  result = db.query("DELETE FROM products WHERE id = '#{id}'")
+
+  # If no product was found, return a 404 error
+  if result.affected_rows == 0
+    halt 404, { message: "Product not found" }.to_json
+  end
+
+  # Return a success message
+  { message: "Product deleted successfully" }.to_json
+end
+
