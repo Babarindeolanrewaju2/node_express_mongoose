@@ -217,3 +217,40 @@ delete '/products/:id' do |id|
   { message: "Product deleted successfully" }.to_json
 end
 
+def extract_token(header)
+  header.scan(/Bearer (.*)$/).flatten.last
+end
+
+def validate_token(token)
+  begin
+    decoded = JWT.decode(token, 'your_secret_key', true, algorithm: 'HS256')
+    return true
+  rescue JWT::DecodeError
+    return false
+  end
+end
+
+
+delete '/products/:id' do |id|
+  # Retrieve the token from the Authorization header
+  token = extract_token(request.env['HTTP_AUTHORIZATION'])
+
+  # Validate the token
+  if validate_token(token)
+
+    # Delete the product with the specified ID from the database
+    result = db.query("DELETE FROM products WHERE id = '#{id}'")
+
+    # If no product was found, return a 404 error
+    if result.affected_rows == 0
+      halt 404, { message: "Product not found" }.to_json
+    end
+
+    # Return a success message
+    { message: "Product deleted successfully" }.to_json
+  else
+    # Return a 401 error if the token is invalid
+    halt 401, { message: "Unauthorized" }.to_json
+  end
+end
+
