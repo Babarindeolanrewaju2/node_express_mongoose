@@ -192,3 +192,153 @@ db.properties.aggregate([
         }
     }
 ])
+
+
+//aggregation filters properties within a specified search radius and then further filters the results by the number of bedrooms and price range
+
+db.properties.aggregate([
+    // Filter documents within the specified search radius
+    {
+        $geoNear: {
+            near: {
+                type: "Point",
+                coordinates: [longitude, latitude]
+            },
+            distanceField: "distance",
+            maxDistance: searchRadius
+        }
+    },
+    // Filter documents by number of bedrooms and price range
+    {
+        $match: {
+            bedrooms: {
+                $gte: minBeds,
+                $lte: maxBeds
+            },
+            price: {
+                $gte: minPrice,
+                $lte: maxPrice
+            }
+        }
+    },
+    // Group documents by property type
+    {
+        $group: {
+            _id: "$propertyType",
+            count: {
+                $sum: 1
+            }
+        }
+    },
+    // Add computed field for house type
+    {
+        $addFields: {
+            houseType: {
+                $cond: [{
+                        $in: ["$_id", ["detached", "semi-detached", "terraced"]]
+                    },
+                    "House",
+                    {
+                        $cond: [{
+                                $in: ["$_id", ["flat"]]
+                            },
+                            "Flat",
+                            {
+                                $cond: [{
+                                        $in: ["$_id", ["bungalow"]]
+                                    },
+                                    "Bungalow",
+                                    {
+                                        $cond: [{
+                                                $in: ["$_id", ["farm", "land"]]
+                                            },
+                                            "Farm/Land",
+                                            {
+                                                $cond: [{
+                                                        $in: ["$_id", ["park home"]]
+                                                    },
+                                                    "Park Home",
+                                                    "Other"
+                                                ]
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    },
+    // Group documents by house type and count
+    {
+        $group: {
+            _id: "$houseType",
+            count: {
+                $sum: "$count"
+            }
+        }
+    },
+    // Project the fields to show the result
+    {
+        $project: {
+            _id: 0,
+            houseType: "$_id",
+            count: 1
+        }
+    }
+])
+
+//search for properties within a 5-mile radius of a specific location, with at least 2 bedrooms but no more than 4 bedrooms, and a monthly rental price between $1000 and $3000. We also want to filter by property type, including detached, semi-detached, and flats.
+db.properties.aggregate([
+    // Match documents within a 5-mile radius
+    {
+        $geoNear: {
+            near: {
+                type: "Point",
+                coordinates: [longitude, latitude]
+            },
+            distanceField: "distance",
+            maxDistance: 5 * 1609.34 // 5 miles in meters
+        }
+    },
+    // Filter documents by number of bedrooms and price range
+    {
+        $match: {
+            bedrooms: {
+                $gte: 2,
+                $lte: 4
+            },
+            price: {
+                $gte: 1000,
+                $lte: 3000
+            }
+        }
+    },
+    // Filter documents by property type
+    {
+        $match: {
+            propertyType: {
+                $in: ["detached", "semi-detached", "flat"]
+            }
+        }
+    },
+    // Group documents by property type and count
+    {
+        $group: {
+            _id: "$propertyType",
+            count: {
+                $sum: 1
+            }
+        }
+    },
+    // Project the fields to show the result
+    {
+        $project: {
+            _id: 0,
+            propertyType: "$_id",
+            count: 1
+        }
+    }
+])
