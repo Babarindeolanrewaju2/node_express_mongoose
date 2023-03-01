@@ -1,3 +1,4 @@
+import geocoder
 import ipinfo
 import requests
 
@@ -18,3 +19,16 @@ print(f"Region: {details.region}")
 print(f"Country: {details.country_name}")
 print(f"Latitude: {details.latitude}")
 print(f"Longitude: {details.longitude}")
+
+
+ip_address = "your_ip_address"  # replace with your system's IP address
+g = geocoder.ip(ip_address)
+
+if g.ok:
+    print(f"City: {g.city}")
+    print(f"State: {g.state}")
+    print(f"Country: {g.country}")
+    print(f"Latitude: {g.lat}")
+    print(f"Longitude: {g.lng}")
+else:
+    print("Could not get location information")
