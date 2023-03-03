@@ -342,3 +342,216 @@ db.properties.aggregate([
         }
     }
 ])
+
+const mongoose = require('mongoose');
+
+const PropertySchema = new mongoose.Schema({
+    location: {
+        type: {
+            type: String,
+            default: 'Point',
+        },
+        coordinates: {
+            type: [Number],
+            required: true,
+        },
+    },
+    bedrooms: {
+        type: Number,
+        required: true,
+    },
+    price: {
+        type: Number,
+        required: true,
+    },
+    propertyType: {
+        type: String,
+        enum: ['detached', 'semi-detached', 'terraced', 'flat', 'bungalow', 'farm', 'land', 'park home'],
+        required: true,
+    },
+    radius: {
+        type: Number,
+        required: true,
+    },
+}, {
+    timestamps: true
+});
+
+PropertySchema.index({
+    location: '2dsphere'
+});
+
+module.exports = mongoose.model('Property', PropertySchema);
+
+
+
+const Property = require('./models/property');
+
+//'london', which will need to be geocoded to obtain the coordinates before running the query
+// Example search criteria
+const searchParams = {
+    searchLocation: 'london',
+    radius: 1,
+    minBeds: 2,
+    maxBeds: 4,
+    priceType: 'perMonth',
+    minPrice: 1000,
+    maxPrice: 2000,
+    propertyTypes: ['detached', 'semi-detached', 'terraced', 'flats', 'bungalows', 'farms/land', 'park homes']
+};
+
+Property.aggregate([
+        // Match documents within a certain radius
+        {
+            $geoNear: {
+                near: {
+                    type: "Point",
+                    coordinates: [searchParams.longitude, searchParams.latitude]
+                },
+                distanceField: "distance",
+                maxDistance: searchParams.radius * 1609.34 // Convert miles to meters
+            }
+        },
+        // Filter documents by number of bedrooms and price range
+        {
+            $match: {
+                bedrooms: {
+                    $gte: searchParams.minBeds,
+                    $lte: searchParams.maxBeds
+                },
+                [searchParams.priceType]: {
+                    $gte: searchParams.minPrice,
+                    $lte: searchParams.maxPrice
+                },
+                propertyType: {
+                    $in: searchParams.propertyTypes
+                }
+            }
+        },
+        // Group documents by property type
+        {
+            $group: {
+                _id: "$propertyType",
+                count: {
+                    $sum: 1
+                }
+            }
+        },
+        // Add computed field for house type
+        {
+            $addFields: {
+                houseType: {
+                    $cond: [{
+                            $in: ["$_id", ["detached", "semi-detached", "terraced"]]
+                        },
+                        "House",
+                        {
+                            $cond: [{
+                                    $in: ["$_id", ["flats"]]
+                                },
+                                "Flat",
+                                {
+                                    $cond: [{
+                                            $in: ["$_id", ["bungalows"]]
+                                        },
+                                        "Bungalow",
+                                        {
+                                            $cond: [{
+                                                    $in: ["$_id", ["farms/land"]]
+                                                },
+                                                "Farm/Land",
+                                                {
+                                                    $cond: [{
+                                                            $in: ["$_id", ["park homes"]]
+                                                        },
+                                                        "Park Home",
+                                                        "Other"
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            }
+        },
+        // Group documents by house type and count
+        {
+            $group: {
+                _id: "$houseType",
+                count: {
+                    $sum: "$count"
+                }
+            }
+        },
+        // Project the fields to show the result
+        {
+            $project: {
+                _id: 0,
+                houseType: "$_id",
+                count: 1
+            }
+        }
+    ])
+    .then(result => {
+        console.log(result);
+    })
+    .catch(error => {
+        console.log(error);
+    });
+
+
+const Property = require('./models/Property');
+
+async function searchProperties(searchArea, searchRadius, minBeds, maxBeds, minPrice, maxPrice, propertyType) {
+    const result = await Property.aggregate([
+        // Match documents within a certain radius
+        {
+            $geoNear: {
+                near: {
+                    type: "Point",
+                    coordinates: searchArea
+                },
+                distanceField: "distance",
+                maxDistance: searchRadius
+            }
+        },
+        // Filter documents by number of bedrooms and price range
+        {
+            $match: {
+                bedrooms: {
+                    $gte: minBeds,
+                    $lte: maxBeds
+                },
+                price: {
+                    $gte: minPrice,
+                    $lte: maxPrice
+                }
+            }
+        },
+        // Filter documents by property type
+        {
+            $match: {
+                propertyType: propertyType
+            }
+        }
+    ]);
+
+    return result;
+}
+
+
+const searchArea = [-0.1278, 51.5074]; // London coordinates
+const searchRadius = 1000; // 1 km
+const minBeds = 2;
+const maxBeds = 4;
+const minPrice = 1000;
+const maxPrice = 2000;
+const propertyType = 'flat';
+
+searchProperties(searchArea, searchRadius, minBeds, maxBeds, minPrice, maxPrice, propertyType)
+    .then(result => console.log(result))
+    .catch(err => console.log(err));
